@@ -66,7 +66,7 @@ class ZTMVirtualMonitorAPI:
         self.__logger.info('Removing tmp directory with all files inside...')
         shutil.rmtree(tmp_files_absolute_directory)
 
-    def __get_next_trip(self, ignored_trips: list = None) -> str:
+    def __get_next_trip(self, ignored_trips: list = None) -> pd.Series:
         current_datetime = datetime.now()
         weekday = current_datetime.strftime('%A').lower()
         time_string = current_datetime.strftime('%H:%M:%S')
@@ -82,12 +82,12 @@ class ZTMVirtualMonitorAPI:
         filtered_stop_times_df = filtered_stop_times_df.reset_index(drop=True)
 
         next_stop_time_idx = np.searchsorted(filtered_stop_times_df['arrival_time'], time_string, side='left')
-        if next_stop_time_idx > (len(self.__stop_times_df) - 1):
+        if next_stop_time_idx > (len(filtered_stop_times_df) - 1):
             next_stop_time_idx = 0
 
-        return self.__stop_times_df.iloc[next_stop_time_idx]
+        return filtered_stop_times_df.iloc[next_stop_time_idx]
 
-    def __get_gtfs_rt_feed_message(self) -> gtfs_realtime_pb2.FeedMessage:
+    def get_gtfs_rt_feed_message(self) -> gtfs_realtime_pb2.FeedMessage:
         fails_counter = 0
         while True:
             try:
@@ -105,6 +105,19 @@ class ZTMVirtualMonitorAPI:
                     break
 
         return None
+
+    def generate_timetable(self, n_trips) -> pd.DataFrame:
+        trips_df = pd.DataFrame(columns=['Arrival time', 'Trip headsign', 'Route ID'])  # TODO check column names, any columns missing?
+        ignored_trips = []
+        while len(trips_df) < n_trips:
+            current_trip = self.__get_next_trip(ignored_trips)
+            ignored_trips.append(current_trip['trip_id'])
+            current_trip_row_from_trips_df = self.__trips_df[self.__trips_df['trip_id'] == current_trip['trip_id']]
+            route_id = current_trip_row_from_trips_df['route_id'].iloc[0]
+            trip_headsing = current_trip_row_from_trips_df['trip_headsign'].iloc[0]
+            trips_df.loc[len(trips_df)] = [current_trip['arrival_time'], route_id, trip_headsing]
+
+        return trips_df
 
 
 @click.command()
@@ -127,16 +140,14 @@ def main(verbose, log):
         datefmt='%Y-%m-%d %H:%M:%S')
 
     vm = ZTMVirtualMonitorAPI()
-    try:
-        while True:
-            gtfs_rt_fm = vm.get_gtfs_rt_feed_message()
-            print(gtfs_rt_fm.header)
-            time.sleep(30)
-    except KeyboardInterrupt:
-        pass
-
-    # TODO test this function
-    # self.__get_next_trip(['4_5900741^N+', '2_5934101^B,N', '4_5900670^B,N'])
+    # try:
+    #     while True:
+    #         gtfs_rt_fm = vm.get_gtfs_rt_feed_message()
+    #         print(gtfs_rt_fm.header)
+    #         time.sleep(30)
+    # except KeyboardInterrupt:
+    #     pass
+    print(vm.generate_timetable(5))
 
 
 if __name__ == '__main__':
