@@ -9,6 +9,8 @@ import click
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import time
+from google.protobuf.message import DecodeError
 
 
 class ZTMVirtualMonitorAPI:
@@ -20,6 +22,7 @@ class ZTMVirtualMonitorAPI:
         self.__gtfs_rt_trip_updates_url = 'https://www.ztm.poznan.pl/pl/dla-deweloperow/getGtfsRtFile?file=trip_updates.pb'
         self.__tmp_files_subdirectory = 'tmp'
         self.__stop_code = 'MOGI42'
+        self.__gtfs_rt_decode_tries_limit = 3
 
         self.__stop_id = None
         self.__stop_times_df = pd.DataFrame()
@@ -84,19 +87,24 @@ class ZTMVirtualMonitorAPI:
 
         return self.__stop_times_df.iloc[next_stop_time_idx]
 
+    def __get_gtfs_rt_feed_message(self) -> gtfs_realtime_pb2.FeedMessage:
+        fails_counter = 0
+        while True:
+            try:
+                self.__logger.info('Downloading GTFS-RT data...')
+                r = requests.get(self.__gtfs_rt_trip_updates_url, allow_redirects=True)
+                feed_message = gtfs_realtime_pb2.FeedMessage()
+                feed_message.ParseFromString(r.content)
+                self.__logger.info('GTFS-RT feed message downloaded and decoded.')
+                return feed_message
+            except DecodeError:
+                self.__logger.info('Could not parse downloaded content! Retrying...')
+                fails_counter += 1
+                if fails_counter >= self.__gtfs_rt_decode_tries_limit:
+                    self.__logger.warning(f'GTFS-RT downloading and decoding limit of {self.__gtfs_rt_decode_tries_limit} tries has been reached!')
+                    break
 
-    def get_virtual_monitor(self, n_trips: int):
-
-        self.__logger.info("Downloading GTFS-RT data...")
-        r = requests.get(self.__gtfs_rt_trip_updates_url, allow_redirects=True)
-        feed_message = gtfs_realtime_pb2.FeedMessage()
-        feed_message.ParseFromString(r.content)
-        print(feed_message)
-
-        # TODO test this function
-        self.__get_next_trip(['4_5900741^N+', '2_5934101^B,N', '4_5900670^B,N'])
-
-
+        return None
 
 
 @click.command()
@@ -119,7 +127,16 @@ def main(verbose, log):
         datefmt='%Y-%m-%d %H:%M:%S')
 
     vm = ZTMVirtualMonitorAPI()
-    vm.get_virtual_monitor(5)
+    try:
+        while True:
+            gtfs_rt_fm = vm.get_gtfs_rt_feed_message()
+            print(gtfs_rt_fm.header)
+            time.sleep(30)
+    except KeyboardInterrupt:
+        pass
+
+    # TODO test this function
+    # self.__get_next_trip(['4_5900741^N+', '2_5934101^B,N', '4_5900670^B,N'])
 
 
 if __name__ == '__main__':
