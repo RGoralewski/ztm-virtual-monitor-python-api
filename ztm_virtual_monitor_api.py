@@ -66,7 +66,7 @@ class ZTMVirtualMonitorAPI:
         self.__logger.info('Removing tmp directory with all files inside...')
         shutil.rmtree(tmp_files_absolute_directory)
 
-    def __get_next_trip(self, ignored_trips: list = None) -> pd.Series:
+    def __get_next_stop_time(self, ignored_trips: list = None) -> pd.Series:
         current_datetime = datetime.now()
         weekday = current_datetime.strftime('%A').lower()
         time_string = current_datetime.strftime('%H:%M:%S')
@@ -87,7 +87,7 @@ class ZTMVirtualMonitorAPI:
 
         return filtered_stop_times_df.iloc[next_stop_time_idx]
 
-    def get_gtfs_rt_feed_message(self) -> gtfs_realtime_pb2.FeedMessage:
+    def __get_gtfs_rt_feed_message(self) -> gtfs_realtime_pb2.FeedMessage:
         fails_counter = 0
         while True:
             try:
@@ -104,18 +104,30 @@ class ZTMVirtualMonitorAPI:
                     self.__logger.warning(f'GTFS-RT downloading and decoding limit of {self.__gtfs_rt_decode_tries_limit} tries has been reached!')
                     break
 
+        self.__logger.warning("Could not get GTFS-RT!")
         return None
 
     def generate_timetable(self, n_trips) -> pd.DataFrame:
-        trips_df = pd.DataFrame(columns=['Arrival time', 'Trip headsign', 'Route ID'])  # TODO check column names, any columns missing?
+
+        gtfs_rt_feed_message = self.__get_gtfs_rt_feed_message()
+
+        trips_df = pd.DataFrame(columns=['arrival_time', 'trip_headsign', 'route_id', 'wheelchair_accessible', 'arrival_realtime'])
         ignored_trips = []
         while len(trips_df) < n_trips:
-            current_trip = self.__get_next_trip(ignored_trips)
-            ignored_trips.append(current_trip['trip_id'])
-            current_trip_row_from_trips_df = self.__trips_df[self.__trips_df['trip_id'] == current_trip['trip_id']]
+            current_stop_time = self.__get_next_stop_time(ignored_trips)
+            ignored_trips.append(current_stop_time['trip_id'])
+
+            arrival_delay = None
+            if gtfs_rt_feed_message:
+                for gtfs_rt_entity in gtfs_rt_feed_message.entity:
+                    if gtfs_rt_entity.trip_update.trip.trip_id == current_stop_time['trip_id']:
+                        arrival_delay = gtfs_rt_entity.trip_update.stop_time_update[0].arrival.delay
+
+            current_trip_row_from_trips_df = self.__trips_df[self.__trips_df['trip_id'] == current_stop_time['trip_id']]
             route_id = current_trip_row_from_trips_df['route_id'].iloc[0]
             trip_headsing = current_trip_row_from_trips_df['trip_headsign'].iloc[0]
-            trips_df.loc[len(trips_df)] = [current_trip['arrival_time'], route_id, trip_headsing]
+            wheelchair_accessible = current_trip_row_from_trips_df['wheelchair_accessible'].iloc[0]
+            trips_df.loc[len(trips_df)] = [current_stop_time['arrival_time'], trip_headsing, route_id, wheelchair_accessible, arrival_delay]
 
         return trips_df
 
@@ -140,14 +152,13 @@ def main(verbose, log):
         datefmt='%Y-%m-%d %H:%M:%S')
 
     vm = ZTMVirtualMonitorAPI()
-    # try:
-    #     while True:
-    #         gtfs_rt_fm = vm.get_gtfs_rt_feed_message()
-    #         print(gtfs_rt_fm.header)
-    #         time.sleep(30)
-    # except KeyboardInterrupt:
-    #     pass
-    print(vm.generate_timetable(5))
+    try:
+        while True:
+            with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+                print(vm.generate_timetable(6))
+            time.sleep(30)
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == '__main__':
