@@ -134,9 +134,10 @@ class ZTMVirtualMonitorAPI:
 
 
 @click.command()
+@click.option('-s', '--stop-code', type=str, required=True, help='Stop code in ZTM Poznan')
 @click.option('-v', '--verbose', count=True, help='Logging level')
 @click.option('-l', '--log', is_flag=True, default=False, help='Enable logging to file')
-def main(verbose, log):
+def main(stop_code, verbose, log):
     log_handlers = [logging.StreamHandler()]
     log_level = {0: logging.INFO, 1: logging.DEBUG}.get(verbose, logging.INFO)
 
@@ -152,7 +153,7 @@ def main(verbose, log):
         format='%(asctime)s|%(levelname)s|%(name)s|%(message)s',
         datefmt='%Y-%m-%d %H:%M:%S')
 
-    vm = ZTMVirtualMonitorAPI('MOGI42')
+    vm = ZTMVirtualMonitorAPI(stop_code)
     try:
         while True:
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
