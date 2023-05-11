@@ -14,23 +14,24 @@ from google.protobuf.message import DecodeError
 
 
 class ZTMVirtualMonitorAPI:
-    def __init__(self):
+    def __init__(self, stop_code: str):
 
         self.__logger = logging.getLogger("ZTMVirtualMonitorAPI")
 
         self.__gtfs_zip_url = 'https://www.ztm.poznan.pl/pl/dla-deweloperow/getGTFSFile'
         self.__gtfs_rt_trip_updates_url = 'https://www.ztm.poznan.pl/pl/dla-deweloperow/getGtfsRtFile?file=trip_updates.pb'
         self.__tmp_files_subdirectory = 'tmp'
-        self.__stop_code = 'MOGI42'
+        self.__stop_code = stop_code
         self.__gtfs_rt_decode_tries_limit = 3
 
         self.__stop_id = None
         self.__stop_times_df = pd.DataFrame()
         self.__trips_df = pd.DataFrame()
+        self.__calendar_df = pd.DataFrame()
 
-        self.__get_initial_gtfs()
+        self.update_initial_gtfs()
 
-    def __get_initial_gtfs(self) -> None:
+    def update_initial_gtfs(self) -> None:
         self.__logger.info("Downloading initial GTFS data...")
         tmp_files_absolute_directory = Path.cwd() / self.__tmp_files_subdirectory
         Path(tmp_files_absolute_directory).mkdir(exist_ok=True)
@@ -151,7 +152,7 @@ def main(verbose, log):
         format='%(asctime)s|%(levelname)s|%(name)s|%(message)s',
         datefmt='%Y-%m-%d %H:%M:%S')
 
-    vm = ZTMVirtualMonitorAPI()
+    vm = ZTMVirtualMonitorAPI('MOGI42')
     try:
         while True:
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
