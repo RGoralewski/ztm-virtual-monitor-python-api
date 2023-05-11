@@ -143,7 +143,7 @@ def main(stop_code, verbose, log):
 
     if log:
         log_handlers.append(
-            logging.FileHandler(datetime.datetime.now().strftime(f"%Y-%m-%d-%H-%M-%S.log"))
+            logging.FileHandler(datetime.now().strftime(f"%Y-%m-%d-%H-%M-%S.log"))
         )
 
     logging.basicConfig(
