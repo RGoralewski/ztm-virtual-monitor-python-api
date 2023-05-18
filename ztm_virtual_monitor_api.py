@@ -1,5 +1,5 @@
 import requests
-import gtfs_realtime_pb2
+from . import gtfs_realtime_pb2
 from pathlib import Path
 import shutil
 import zipfile
