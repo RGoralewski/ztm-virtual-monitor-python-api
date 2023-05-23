@@ -1,5 +1,8 @@
 import requests
-from . import gtfs_realtime_pb2
+try:
+    from . import gtfs_realtime_pb2
+except ImportError:
+    import gtfs_realtime_pb2
 from pathlib import Path
 import shutil
 import zipfile
@@ -157,6 +160,7 @@ def main(stop_code, verbose, log):
     try:
         while True:
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+                blah = vm.generate_timetable(6)
                 print(vm.generate_timetable(6))
             time.sleep(30)
     except KeyboardInterrupt:
