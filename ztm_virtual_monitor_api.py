@@ -138,9 +138,11 @@ class ZTMVirtualMonitorAPI:
 
 @click.command()
 @click.option('-s', '--stop-code', type=str, required=True, help='Stop code in ZTM Poznan')
+@click.option('-t', '--timetable-length', type=int, required=True,
+              help='A number of rows in result dataframe with trips')
 @click.option('-v', '--verbose', count=True, help='Logging level')
 @click.option('-l', '--log', is_flag=True, default=False, help='Enable logging to file')
-def main(stop_code, verbose, log):
+def main(stop_code, timetable_length, verbose, log):
     log_handlers = [logging.StreamHandler()]
     log_level = {0: logging.INFO, 1: logging.DEBUG}.get(verbose, logging.INFO)
 
@@ -160,8 +162,7 @@ def main(stop_code, verbose, log):
     try:
         while True:
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-                blah = vm.generate_timetable(6)
-                print(vm.generate_timetable(6))
+                print(vm.generate_timetable(timetable_length))
             time.sleep(30)
     except KeyboardInterrupt:
         pass
